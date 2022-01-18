@@ -4,7 +4,6 @@ from IPython import embed
 
 import argparse
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-model", help="the model file")
@@ -27,8 +26,6 @@ if __name__ == '__main__':
         eos_token_id = tokenizer.convert_tokens_to_ids("[eoo]"),
         max_length = 512
     )
-    embed()
-    exit()
 
     output = pd.DataFrame({'Source Text': labels, 'Generated Text': tokenizer.batch_decode(output_sequences, skip_special_tokens=False, padding=False)})
     output.to_csv(args.output)

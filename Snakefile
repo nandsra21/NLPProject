@@ -1,19 +1,37 @@
 from snakemake.utils import min_version
 min_version("6.0")
 
-MODEL_VAL = ["1"]
+MODEL_VAL = ["2"]
 rule all:
     input:
-        expand('model_{version}', version=MODEL_VAL),
-        expand('/predictions_{version}.csv', version=MODEL_VAL)
+        directory(expand('model_{version}', version=MODEL_VAL)),
+        expand('predictions_{version}.csv', version=MODEL_VAL),
+        expand("accuracy_values_{version}.csv", version=MODEL_VAL)
 
-""" TODO: make rule to create data after cleaning up jupyter notebook, add NLG demo, add accuracy script """
+# --- TODO: make rule to create data after cleaning up jupyter notebook, add NLG demo, add accuracy script --- #
+
+##rule create_data:
+##    message: "creating dataframe in the correct form"
+##    input:
+##        train = "SBIC.v2.trn.csv",
+##        dev = "SBIC.v2.dev.csv",
+##        test = "SBIC.v2.tst.csv"
+##    output:
+##        train = expand("dataset_{version}", version=MODEL_VAL),
+##        dev = expand("dataset_{version}", version=MODEL_VAL),
+##        test = expand("dataset_{version}", version=MODEL_VAL)
+##    params:
+    # --- pick from regular, scrambled, even split --- #
+##        type_of_data = "regular"
+##    notebook:
+##        "csv_manipulate.ipynb"
+
 rule create_model:
     input:
-        training_csv = "SBIC.trn.1.csv",
+        training_csv = "SBIC.trn.2.5050.csv",
         validation_csv = "SBIC.dev.1.csv"
     output:
-        model = expand('model_{version}', version=MODEL_VAL),
+        model = directory(expand('model_{version}', version=MODEL_VAL)),
     shell:
         """
         python3 classifier.py \
@@ -27,7 +45,7 @@ rule generate_predictions:
         model = rules.create_model.output.model,
         validation_csv = "SBIC.dev.1.csv"
     output:
-        predictions = expand('/predictions_{version}.csv', version=MODEL_VAL)
+        predictions = expand('predictions_{version}.csv', version=MODEL_VAL)
     shell:
         """
         python3 predictions.py \
@@ -36,20 +54,21 @@ rule generate_predictions:
             --output {output.predictions}
         """
 
-"""
 rule get_accuracy_metrics:
-message: "running PCA before removing any low quality strains for supplemental figure bases missing vs pc1"
-input:
-    alignment = rules.extract_sequences.output.sequences
-output:
-    dataframe = "results/embed_pca_before.csv"
-params:
-    components = 10
-conda: "../cartography.yml"
-shell:
-"""
-"""
-"""
+    message: "running accuracy metrics on the predictions"
+    input:
+        predictions = rules.generate_predictions.output.predictions,
+        model_truth = "SBIC.v2.dev.csv"
+    output:
+        dataframe = expand("accuracy_values_{version}.csv", version=MODEL_VAL)
+    shell:
+        """
+        python3 accuracy_metrics.py \
+            --input-model-truth {input.model_truth} \
+            --input-predictions {input.predictions} \
+            --output {output.dataframe}
+        """
+
 rule clean:
     message: "Removing directories: {params}"
     params:

@@ -15,8 +15,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    model_num = 1
-
     dataset = load_dataset('csv', data_files={'train': [args.input_training],
                                               'test': [args.input_validation]})
                                               #column_names=["input", "output"])
@@ -49,8 +47,6 @@ if __name__ == '__main__':
     print(str(train_dataset[0])[:100])
     embed()
 
-    optimizer = AdamW(model.parameters(), lr=5e-5)
-
     training_args = TrainingArguments(
         output_dir=args.output,
         num_train_epochs=10,
@@ -59,7 +55,7 @@ if __name__ == '__main__':
         eval_accumulation_steps=1,  # Number of eval steps to keep in GPU (the higher, the mor vRAM used)
         prediction_loss_only=True,
         # If I need co compute only loss and not other metrics, setting this to true will use less RAM
-        learning_rate=1e-5, #this is already a learning rate scheduler
+        learning_rate=3e-4, #this is already a learning rate scheduler
         # Will default to an instance of AdamW on your model and a scheduler given by
         # get_linear_schedule_with_warmup() controlled by args
         evaluation_strategy='steps',  # Run evaluation every eval_steps
