@@ -1,6 +1,6 @@
 # NLP Project: Creating a T5 model to detect hate speech/microagressions
 
-This is the code for work being done by Sravani Nanduri, Maarten Sap, and Liwei Jiang.
+This is the code for work being done by Sravani Nanduri, Dr. Maarten Sap, and Liwei Jiang through [Dr. Yejin Choi](https://homes.cs.washington.edu/~yejin/).
 
 ## Setup Instructions:
 All packages can be installed via conda. Install anaconda [here](https://docs.anaconda.com/anaconda/install/index.html),
