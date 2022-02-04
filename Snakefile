@@ -1,16 +1,16 @@
 from snakemake.utils import min_version
 min_version("6.0")
 
-MODEL_VAL = ["2"]
+MODEL_VAL = ["3"]
 rule all:
     input:
         directory(expand('model_{version}', version=MODEL_VAL)),
         expand('predictions_{version}.csv', version=MODEL_VAL),
-        expand("accuracy_values_{version}.csv", version=MODEL_VAL)
+        #expand("accuracy_values_{version}.csv", version=MODEL_VAL)
 
 # --- TODO: make rule to create data after cleaning up jupyter notebook, add NLG demo, add accuracy script --- #
 
-##rule create_data:
+## rule create_data:
 ##    message: "creating dataframe in the correct form"
 ##    input:
 ##        train = "SBIC.v2.trn.csv",
@@ -21,15 +21,15 @@ rule all:
 ##        dev = expand("dataset_{version}", version=MODEL_VAL),
 ##        test = expand("dataset_{version}", version=MODEL_VAL)
 ##    params:
-    # --- pick from regular, scrambled, even split --- #
+        # --- pick from regular, scrambled, even split --- #
 ##        type_of_data = "regular"
 ##    notebook:
-##        "csv_manipulate.ipynb"
+##        "csv_manipulate_final.ipynb"
 
 rule create_model:
     input:
-        training_csv = "SBIC.trn.2.5050.csv",
-        validation_csv = "SBIC.dev.1.csv"
+        training_csv = "SBIC.trn.scramble.3.5050.csv",
+        validation_csv = "SBIC.dev.scramble.3.5050.csv"
     output:
         model = directory(expand('model_{version}', version=MODEL_VAL)),
     shell:
@@ -43,7 +43,7 @@ rule create_model:
 rule generate_predictions:
     input:
         model = rules.create_model.output.model,
-        validation_csv = "SBIC.dev.1.csv"
+        validation_csv = "SBIC.dev.scramble.3.5050.csv"
     output:
         predictions = expand('predictions_{version}.csv', version=MODEL_VAL)
     shell:
@@ -58,7 +58,7 @@ rule get_accuracy_metrics:
     message: "running accuracy metrics on the predictions"
     input:
         predictions = rules.generate_predictions.output.predictions,
-        model_truth = "SBIC.v2.dev.csv"
+        model_truth = "SBIC.dev.scramble.3.5050.csv"
     output:
         dataframe = expand("accuracy_values_{version}.csv", version=MODEL_VAL)
     shell:
@@ -69,11 +69,9 @@ rule get_accuracy_metrics:
             --output {output.dataframe}
         """
 
-rule clean:
-    message: "Removing directories: {params}"
-    params:
-        "model_1"
-        "predictions_1.csv"
-        "predictions_1.xslx"
-    shell:
-        "rm -rfv {params}"
+##rule clean:
+##    message: "Removing directories: {params}"
+##    params:
+##        "predictions_1.csv"
+##    shell:
+##        "rm -rfv {params}"
