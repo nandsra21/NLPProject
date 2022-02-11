@@ -21,8 +21,8 @@ if __name__ == '__main__':
     train_dataset = dataset['train']
     val_dataset = dataset['test']
 
-    tokenizer = T5Tokenizer.from_pretrained("t5-small")
-    model = T5ForConditionalGeneration.from_pretrained("t5-small")
+    tokenizer = T5Tokenizer.from_pretrained("t5-base")
+    model = T5ForConditionalGeneration.from_pretrained("t5-base")
 
     def tokenize(batch):
         tokenized_input = tokenizer(batch['input'], padding='max_length', truncation=True, add_special_tokens=False)

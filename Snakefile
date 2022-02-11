@@ -1,7 +1,7 @@
 from snakemake.utils import min_version
 min_version("6.0")
 
-MODEL_VAL = ["3"]
+MODEL_VAL = ["4"]
 rule all:
     input:
         directory(expand('model_{version}', version=MODEL_VAL)),
@@ -12,6 +12,7 @@ rule all:
 
 ## rule create_data:
 ##    message: "creating dataframe in the correct form"
+##    input:
 ##    input:
 ##        train = "SBIC.v2.trn.csv",
 ##        dev = "SBIC.v2.dev.csv",
@@ -28,8 +29,8 @@ rule all:
 
 rule create_model:
     input:
-        training_csv = "SBIC.trn.scramble.3.5050.csv",
-        validation_csv = "SBIC.dev.scramble.3.5050.csv"
+        training_csv = "SBIC.trn.scramble.4.csv",
+        validation_csv = "SBIC.dev.scramble.4.csv"
     output:
         model = directory(expand('model_{version}', version=MODEL_VAL)),
     shell:
@@ -43,7 +44,7 @@ rule create_model:
 rule generate_predictions:
     input:
         model = rules.create_model.output.model,
-        validation_csv = "SBIC.dev.scramble.3.5050.csv"
+        validation_csv = "SBIC.dev.scramble.4.csv"
     output:
         predictions = expand('predictions_{version}.csv', version=MODEL_VAL)
     shell:
@@ -58,7 +59,7 @@ rule get_accuracy_metrics:
     message: "running accuracy metrics on the predictions"
     input:
         predictions = rules.generate_predictions.output.predictions,
-        model_truth = "SBIC.dev.scramble.3.5050.csv"
+        model_truth = "SBIC.dev.scramble.4.csv"
     output:
         dataframe = expand("accuracy_values_{version}.csv", version=MODEL_VAL)
     shell:
