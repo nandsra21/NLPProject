@@ -3,6 +3,7 @@ from transformers import T5Tokenizer, T5ForConditionalGeneration, Trainer, Train
 from transformers.integrations import TensorBoardCallback
 from IPython import embed
 import numpy as np
+import torch
 
 import argparse
 
@@ -21,12 +22,15 @@ if __name__ == '__main__':
     train_dataset = dataset['train']
     val_dataset = dataset['test']
 
-    tokenizer = T5Tokenizer.from_pretrained("t5-base")
-    model = T5ForConditionalGeneration.from_pretrained("t5-base")
+    tokenizer = T5Tokenizer.from_pretrained("t5-small") # take from most recent checkpoints
+    model = T5ForConditionalGeneration.from_pretrained("t5-small")#"model_4/checkpoint-110000")#"t5-base")
+
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    torch.cuda.empty_cache()
 
     def tokenize(batch):
-        tokenized_input = tokenizer(batch['input'], padding='max_length', truncation=True, add_special_tokens=False)
-        tokenized_label = tokenizer(batch['output'], padding='max_length', truncation=True, add_special_tokens=False)
+        tokenized_input = tokenizer(batch['input'], padding='max_length', truncation=True, max_length = 128, add_special_tokens=False)
+        tokenized_label = tokenizer(batch['output'], padding='max_length', truncation=True, max_length = 64, add_special_tokens=False)
 
         tokenized_input['labels'] = tokenized_label['input_ids']
 
@@ -38,18 +42,15 @@ if __name__ == '__main__':
 
     tokenizer.save_pretrained(args.output + "/tokenizer/")
 
-    train_dataset = train_dataset.map(tokenize, batched=True, batch_size=128)
-    val_dataset = val_dataset.map(tokenize, batched=True, batch_size=128)
+    train_dataset = train_dataset.map(tokenize, batched=True, batch_size=32)
+    val_dataset = val_dataset.map(tokenize, batched=True, batch_size=32)
 
     train_dataset.set_format('numpy', columns=['input_ids', 'attention_mask', 'labels'])
     val_dataset.set_format('numpy', columns=['input_ids', 'attention_mask', 'labels'])
 
-    print(str(train_dataset[0])[:100])
-    embed()
-
     training_args = TrainingArguments(
         output_dir=args.output,
-        num_train_epochs=10,
+        num_train_epochs=50,
         per_device_train_batch_size=8,
         per_device_eval_batch_size=8,
         eval_accumulation_steps=1,  # Number of eval steps to keep in GPU (the higher, the mor vRAM used)
@@ -66,12 +67,11 @@ if __name__ == '__main__':
         run_name='run_name',  # Wandb run name
         logging_dir= args.output + '/logs',
         logging_steps=1000,  # How often to log loss to wandb
-        eval_steps=1000,  # How often to run evaluation on the val_set
+        eval_steps=1000,  # How often to run evaluation on the val_set (increase eval_steps)
         logging_first_step=False,  # Whether to log also the very first training step to wandb
         metric_for_best_model="loss",  # Use loss to evaluate best model.
         greater_is_better=False  # Best model is the one with the lowest loss, not highest.
     )
-
     def compute_metrics(eval_preds):
         metric = load_metric("glue", "mrpc")
         logits, labels = eval_preds
@@ -79,7 +79,7 @@ if __name__ == '__main__':
         return metric.compute(predictions=predictions, references=labels)
 
     trainer = Trainer(
-        model=model,
+        model=model.to(device),
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
