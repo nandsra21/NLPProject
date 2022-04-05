@@ -80,13 +80,14 @@ class NewMetric(datasets.Metric):
 
     def _compute(self, predictions, references):
     # OFFY VS OFFN
-
+        import sys
         accuracy_score = sum((("OffY" in i and "OffY" in j) or ("OffN" in i and "OffN" in j))
                              for i, j in zip(predictions, references)) / len(predictions)
 
-        return accuracy_score
+        return { "accuracy" : accuracy_score }
 
-    # STRUCTURAL ACC
+
+    # ADD STRUCTURAL ACC
 
     # import re
     # import numpy as np

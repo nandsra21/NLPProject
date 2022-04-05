@@ -17,8 +17,9 @@ my_file.close()
 
 rule all:
     input:
-        directory(expand('model_{version}_3', version=MODEL_VAL)),
-        expand('predictions_{version}_3.csv', version=MODEL_VAL),
+        #"predictions_initial_test_10.csv"
+        expand('model_{version}_4/model_{version}_4.pth', version=MODEL_VAL),
+        #expand('predictions_{version}_4.csv', version=MODEL_VAL),
         #expand("accuracy_values_{version}_{checkpoint}.txt", version=MODEL_VAL, checkpoint = CHECKPOINTS)
         #expand("accuracy_values_{version}.csv", version=MODEL_VAL)
 
@@ -43,10 +44,11 @@ rule all:
 
 rule create_model:
     input:
-        training_csv = "sample.50.csv",
-        validation_csv = "sample.50.dev.csv"
+        training_csv = "sample.16.dev.csv",
+        validation_csv = "sample.16.dev.csv"
     output:
-        model = directory(expand('model_{version}_3', version=MODEL_VAL)),
+        model = expand('model_{version}_4/model_{version}_4.pth', version=MODEL_VAL),
+        #predictions_initial= "predictions_initial_test_10.csv"
     shell:
         """
         python3 classifier_pytorch.py \
@@ -54,7 +56,7 @@ rule create_model:
             --input-validation {input.validation_csv} \
             --output {output.model}
         """
-
+#--predictions-initial {output.predictions_initial} \
 
 
 # Generation of predictions:
@@ -122,54 +124,56 @@ IDS = [f"input_preds_{i}" for i in range(1,val)]
 #            --output {output.predictions}
 #        """
 
-rule generate_predictions:
-    input:
-        model_parent = rules.create_model.output.model,
-        model = "model_test_3/",
-        validation_csv = "sample.50.dev.csv"
-    output:
-        predictions = expand('predictions_{version}_3.csv', version=MODEL_VAL),
-    shell:
-        """
-        python3 predictions.py \
-            --parent-model {input.model_parent} \
-            --input-model {input.model} \
-            --input-validation {input.validation_csv} \
-            --output {output.predictions}
-        """
+# rule generate_predictions:
+#     input:
+#         model_parent = rules.create_model.output.model,
+#         model = "model_test_4/model_test_4.pth",
+#         validation_csv = "sample.50.dev.csv"
+#     output:
+#         predictions = expand('predictions_{version}_4.csv', version=MODEL_VAL),
+#         predictions_initial = "predictions_initial_test_4.csv"
+#     shell:
+#         """
+#         python3 predictions_pytorch.py \
+#             --parent-model {input.model_parent} \
+#             --input-model {input.model} \
+#             --input-validation {input.validation_csv} \
+#             --predictions-initial{output.predictions_initial} \
+#             --output {output.predictions}
+#         """
 
 
 # take all generated dataframes and concatenate
-rule aggregate_prediction:
-    input:
-        check = rules.generate_predictions.output,
-        tables=expand('predictions_{version}/{id}_{checkpoint}.csv', checkpoint = CHECKPOINTS, version=MODEL_VAL, id = IDS)
-    output:
-        table= expand('predictions_{version}_{checkpoint}.csv', version=MODEL_VAL, checkpoint = CHECKPOINTS)
-    params:
-        splitOn = val
-    shell:
-        """
-        python3 concatenate_tables.py \
-            --tables {input.tables} \
-            --split {params.splitOn} \
-            --output {output.table}
-        """
-
-rule get_accuracy_metrics:
-    message: "running accuracy metrics on the predictions"
-    input:
-        predictions = rules.aggregate_prediction.output.table,
-        model_truth = "SBIC.dev.scramble.4.csv"
-    output:
-        dataframe = expand("accuracy_values_{version}_{checkpoint}.txt", version=MODEL_VAL, checkpoint = CHECKPOINTS)
-    shell:
-        """
-        python3 accuracy_offNvsY.py \
-            --input-model-truth {input.model_truth} \
-            --input-predictions {input.predictions} \
-            --output {output.dataframe}
-        """
+# rule aggregate_prediction:
+#     input:
+#         check = rules.generate_predictions.output,
+#         tables=expand('predictions_{version}/{id}_{checkpoint}.csv', checkpoint = CHECKPOINTS, version=MODEL_VAL, id = IDS)
+#     output:
+#         table= expand('predictions_{version}_{checkpoint}.csv', version=MODEL_VAL, checkpoint = CHECKPOINTS)
+#     params:
+#         splitOn = val
+#     shell:
+#         """
+#         python3 concatenate_tables.py \
+#             --tables {input.tables} \
+#             --split {params.splitOn} \
+#             --output {output.table}
+#         """
+#
+# rule get_accuracy_metrics:
+#     message: "running accuracy metrics on the predictions"
+#     input:
+#         predictions = rules.aggregate_prediction.output.table,
+#         model_truth = "SBIC.dev.scramble.4.csv"
+#     output:
+#         dataframe = expand("accuracy_values_{version}_{checkpoint}.txt", version=MODEL_VAL, checkpoint = CHECKPOINTS)
+#     shell:
+#         """
+#         python3 accuracy_offNvsY.py \
+#             --input-model-truth {input.model_truth} \
+#             --input-predictions {input.predictions} \
+#             --output {output.dataframe}
+#         """
 
 ##rule clean:
 ##    message: "Removing directories: {params}"
