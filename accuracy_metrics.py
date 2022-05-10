@@ -2,96 +2,81 @@ from sklearn.metrics import f1_score
 import re
 import numpy as np
 import pandas as pd
-
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 import argparse
 
+def BLEUScores(merged_df_preds):
+    # get data within the implication bounds
+    list_preds = merged_df_preds["generated"].tolist()
+    real_val_list = merged_df_preds["output"].tolist()
+    import re
+    total_val = []
+    for i in range(0, len(list_preds)):
+        list_preds[i] = list_preds[i].replace("<pad>", "").replace("[eoo]", "").replace("[cls]", "").replace(
+            "[boo]", "")
+        real_val_list[i] = real_val_list[i].replace("<pad>", "").replace("[eoo]", "").replace("[cls]", "").replace(
+            "[boo]", "")
+        if "[ste]" in list_preds[i] and "[ste]" in real_val_list[i]:
+            reference = [list_preds[i].split("[ste]")[1].strip().split(" ")]
+            candidate = real_val_list[i].split("[ste]")[1].strip().split(" ")
+            twogram = sentence_bleu(reference, candidate, weights=(0.5, 0.5, 0, 0),
+                                    smoothing_function=SmoothingFunction(epsilon=1e-12).method1)
+            threegram = sentence_bleu(reference, candidate, weights=(0.33, 0.33, 0.33, 0),
+                                      smoothing_function=SmoothingFunction(epsilon=1e-12).method1)
+            total_val.append((twogram + threegram) / 2)
+    # 2 and 3 gram mean for all the data
+    # compare data to actual implications using BLEU score
+    # smoothing method1 - NLTK sentence_bleu add
+    # steps: find where the data that takes implications is in the actual data, compare it with the other one
+    return np.mean(total_val)
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input-model-truth", help="comma separated file with an input and output row")
-    parser.add_argument("--input-predictions", help="comma separated file with an input and output row")
-    parser.add_argument("--output", help="the text file to save the accuracy data into")
 
-    args = parser.parse_args()
+def structural_acc(merged_df_preds):
+    total_values = []
+    # TODO: add in a check to make sure the prediction is correct before adding it to total_values
+    for i in range(0, len(merged_df_preds)):
+        if (i % 1000 == 0):
+            print(i)
+        # find all tokens between square brackets
+        tokens_input = re.findall("(?<=\[)[^]]+(?=\])", merged_df_preds["output"].tolist()[i])
+        tokens_generated = re.findall("(?<=\[)[^]]+(?=\])", merged_df_preds["generated"].tolist()[i])
+        # compare the arrays elementwise to determine number of tokens correctly preserved, divide by total amount of tokens preserved
+        try:
+            total_values.append((np.array(tokens_input) == np.array(tokens_generated)).sum() / len(tokens_input))
+        # short term solution to deal with arrays that are not the same length: talk in meeting about best way to mitigate
+        except:
+            total_values.append(0);
+    return (np.mean(total_values))
 
-    y_true = pd.read_csv(args.input_model_truth)
-    y_pred = pd.read_csv(args.input_predictions, index_col=0)
-    y_pred.columns = ["input", "generated"]
 
-    merged_df = real_val.merge(preds, on="input", how="inner")
+def offYAcc(df):
 
-    y_pred["Source Text"] = y_pred["Source Text"].apply(lambda x: x.replace("[boi] ", "")).apply(
-        lambda x: x.replace(" [eoi]", ""))
+    return sum((("OffY" in row['output'] and "OffY" in row['generated']) or
+                ("OffN" in row['output'] and "OffN" in row["generated"]))
+               for index, row in df.iterrows()) / len(df)
 
-    y_pred["Generated Text"] = y_pred["Generated Text"].apply(lambda x: x.replace("<pad> ", "")).apply(
-        lambda x: x.replace(" <pad>", ""))
-    y_pred.columns = ["post", "output"]
-
-    y_data = y_pred["output"].values
-    list_of_data = []
-    # split on parenthesis
-    for i in range(0, len(y_pred)):
-        list_of_data.append(list(filter(lambda x: x != "", [sentence.strip() for sentence in
-                                                    y_data[i].replace("<pad>", '').replace("[", '').replace("boo",'')
-                                                    .replace("grp", '').replace("ste", '').replace("eoo", '')
-                                                    .split(']')])))
-
-    list_of_data = pd.DataFrame(list_of_data)
-    list_of_data[0] = list_of_data[0].apply(lambda label: 1 if label == "OffN" else 0)
-    
-    sum_int = sum(list_of_data[0].values == y_true["offensiveYN"].values)
-
-    accuracy_score = sum_int / len(y_true["offensiveYN"])
-
-    f1_val = f1_score(y_true["offensiveYN"].values, list_of_data[0].values)
-
-    # Qualitative Testing
-
+# Qualitative Testing
+def group_testing(df):
     match = []
-    for i in range(0, len(list_of_data)):
-        if list(y_true["offensiveYN"].values)[i] == 0:
-            list_of_data_val = str(list(list_of_data[1].values)[i])
-            y_true_val = list(y_true["group"].values)
-            match.append(any(list_of_data_val in s for s in y_true_val))
-            
-    raw_accuracy_group = sum(match) / len(match)
+    for index, row in df.iterrows():
+        output_str = row["output"]
+        generated_str = row["generated"]
+        output = re.search(r'[grp](.*?)[ste]', output_str).group(1)
+        generated = re.search(r'[grp](.*?)[ste]', generated_str).group(1)
+        if (("OffY" in row['output'] and "OffY" in row['generated']) or
+                ("OffN" in row['output'] and "OffN" in row["generated"])):
+            match.append(any((output in generate or generate in output) for generate in generated.split()))
 
-    list_of_data_preds = []
-    list_of_data_real = []
-    merged_df["output"] = merged_df["output"].apply(lambda x: x.replace("[boi] ", "")).apply(
-        lambda x: x.replace(" [eoi]", ""))
+    return sum(match) / len(match)
 
-    merged_df["generated"] = merged_df["generated"].apply(lambda x: x.replace("<pad> ", "")).apply(
-        lambda x: x.replace(" <pad>", ""))
+def main(input_predictions):
+    df = pd.read_csv(input_predictions, index_col=0).reset_index(drop=True)
+    df.columns = ["output", "generated"]
+    struc_acc = structural_acc(df)
+    bleu_score = BLEUScores(df)
+    offy_acc = offYAcc(df)
+    group_test = group_testing(df)
 
-    y_data_real = merged_df["output"].values
-    y_data_preds = merged_df["generated"].values
-
-    # filter out incorrect results
-    for i in range(0, len(merged_df)):
-        list_of_data_preds.append(list(filter(lambda x: x != "", [sentence.strip() for sentence in
-                                                                  y_data_preds[i].replace("<pad>", '').replace("[",
-                                                                                                               '').replace(
-                                                                      "boo", '')
-                                              .replace("grp", '').replace("ste", '').replace("eoo", '')
-                                              .split(']')])))
-        list_of_data_real.append(list(filter(lambda x: x != "", [sentence.strip() for sentence in
-                                                                 y_data_real[i].replace("<pad>", '').replace("[",
-                                                                                                             '').replace(
-                                                                     "boo", '')
-                                             .replace("grp", '').replace("ste", '').replace("eoo", '')
-                                             .split(']')])))
-
-    list_of_data_real = pd.DataFrame(list_of_data_real)
-    list_of_data_preds = pd.DataFrame(list_of_data_preds)
-    list_of_data_real[0] = list_of_data_real[0].apply(lambda label: 1 if label == "OffN" else 0)
-    list_of_data_preds[0] = list_of_data_preds[0].apply(lambda label: 1 if label == "OffN" else 0)
-    mask = (list_of_data_real[0] == list_of_data_preds[0])
-
-
-    with open(args.output, 'w') as f:
-        f.write("raw accuracy of the Offensive YN: \n" + str(accuracy_score))
-        f.write("f1 accuracy score of Offensive YN: \n" + str(f1_val))
-        f.write("raw accuracy score of the group tokens: \n" + str(raw_accuracy_group))
-
-    f.close()
+    dictionary = dict(zip(["stuctural_acc", "raw_acc_OffYN", "raw_acc_group", "BLEU_acc"], [struc_acc, offy_acc, group_test, bleu_score]))
+    print(dictionary)
+    #output_df.to_csv(output)

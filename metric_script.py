@@ -15,7 +15,6 @@
 
 import datasets
 
-
 # TODO: Add BibTeX citation
 _CITATION = """\
 @InProceedings{huggingface:metric,
@@ -29,7 +28,6 @@ year={2022}
 _DESCRIPTION = """\
 This new metric is designed to solve this great NLP task and is crafted with a lot of care.
 """
-
 
 # TODO: Add description of the arguments of the metric here
 _KWARGS_DESCRIPTION = """
@@ -50,6 +48,7 @@ Examples:
     >>> print(results)
     {'accuracy': 1.0}
 """
+
 
 # TODO: Define external resources urls if needed
 # BAD_WORDS_URL = "http://url/to/external/resource/bad_words.txt"
@@ -79,29 +78,37 @@ class NewMetric(datasets.Metric):
         )
 
     def _compute(self, predictions, references):
-    # OFFY VS OFFN
         import sys
+        import re
+        import numpy as np
         accuracy_score = sum((("OffY" in i and "OffY" in j) or ("OffN" in i and "OffN" in j))
                              for i, j in zip(predictions, references)) / len(predictions)
 
-        return { "accuracy" : accuracy_score }
+        tokens_input = [re.findall("(?<=\[)[^]]+(?=\])", reference) for reference in references]
+        tokens_generated = [re.findall("(?<=\[)[^]]+(?=\])", prediction) for prediction in predictions]
+        # compare the arrays elementwise to determine number of tokens correctly preserved, divide by total amount of tokens preserved
+        if len(tokens_input) == len(tokens_generated):
+            structural_score = sum(x == y for x, y in zip(tokens_input, tokens_generated)) / len(tokens_input)
+        else:
+            structural_score = 0
 
+        return {"accuracy": (accuracy_score + structural_score) / 2}
 
-    # ADD STRUCTURAL ACC
+# ADD STRUCTURAL ACC
 
-    # import re
-    # import numpy as np
-    # total_values = []
-    # # TODO: add in a check to make sure the prediction is correct before adding it to total_values
-    # for i in range(0, len(merged_df)):
-    #     # find all tokens between square brackets
-    #     tokens_input = re.findall("(?<=\[)[^]]+(?=\])", merged_df["output"].tolist()[i])
-    #     tokens_generated = re.findall("(?<=\[)[^]]+(?=\])", merged_df["generated"].tolist()[i])
-    #     #compare the arrays elementwise to determine number of tokens correctly preserved, divide by total amount of tokens preserved
-    #     try:
-    #         total_values.append((np.array(tokens_input)==np.array(tokens_generated)).sum()/len(tokens_input))
-    #     #short term solution to deal with arrays that are not the same length: talk in meeting about best way to mitigate
-    #     except:
-    #         total_values.append(0);
-    #
-    # print(np.mean(total_values))
+# import re
+# import numpy as np
+# total_values = []
+# # TODO: add in a check to make sure the prediction is correct before adding it to total_values
+# for i in range(0, len(merged_df)):
+#     # find all tokens between square brackets
+#     tokens_input = re.findall("(?<=\[)[^]]+(?=\])", merged_df["output"].tolist()[i])
+#     tokens_generated = re.findall("(?<=\[)[^]]+(?=\])", merged_df["generated"].tolist()[i])
+#     #compare the arrays elementwise to determine number of tokens correctly preserved, divide by total amount of tokens preserved
+#     try:
+#         total_values.append((np.array(tokens_input)==np.array(tokens_generated)).sum()/len(tokens_input))
+#     #short term solution to deal with arrays that are not the same length: talk in meeting about best way to mitigate
+#     except:
+#         total_values.append(0);
+#
+# print(np.mean(total_values))
