@@ -21,7 +21,7 @@ SAMPLES = ["100K"]#10K", "50K", "100K"]
 rule all:
     input:
         #"predictions_initial_test_10.csv"
-        model = expand('model_test_grid_search_7/final/model_{num}_{lr}_{epoch}.pth', num=SAMPLES, lr=LR, epoch=EPOCHS)
+        model = expand('model_test_grid_search_8/final/model_{num}_{lr}_{epoch}.pth', num=SAMPLES, lr=LR, epoch=EPOCHS)
         #expand('predictions_{version}_4.csv', version=MODEL_VAL),
         #expand("accuracy_values_{version}_{checkpoint}.txt", version=MODEL_VAL, checkpoint = CHECKPOINTS)
         #expand("accuracy_values_{version}.csv", version=MODEL_VAL)
@@ -49,8 +49,8 @@ rule create_model:
         training_csv = expand("sample.{num}.csv", num = SAMPLES),
         validation_csv = expand("sample.{num}.dev.csv", num = SAMPLES),
     output:
-        model = expand('model_test_grid_search_7/final/model_{num}_{lr}_{epoch}.pth', num=SAMPLES, lr=LR, epoch=EPOCHS),
-        #predictions_initial = expand('model_test_grid_search_7/model_{num}_{lr}_{epoch}/predictions/predictions.csv"', num=SAMPLES, lr=LR, epoch=EPOCHS)
+        model = expand('model_test_grid_search_8/final/model_{num}_{lr}_{epoch}.pth', num=SAMPLES, lr=LR, epoch=EPOCHS),
+        #predictions_initial = expand('model_test_grid_search_8/model_{num}_{lr}_{epoch}/predictions/predictions.csv"', num=SAMPLES, lr=LR, epoch=EPOCHS)
     shell:
         """
         python3 classifier_pytorch.py \

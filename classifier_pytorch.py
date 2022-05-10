@@ -70,7 +70,6 @@ def offYAcc(df):
 # Qualitative Testing
 def group_testing(df):
     match = []
-    df.columns = ["output", "generated"]
     for index, row in df.iterrows():
         output_str = row["output"]
         generated_str = row["generated"]
@@ -90,7 +89,10 @@ def group_testing(df):
 
 def main(input_predictions, output):
     df = input_predictions.copy()
-    df.columns = ["output", "generated"]
+    if (len(list(df.columns)) == 3):
+        df.columns = ["output", "generated", "actual"]
+    else:
+        df.columns = ["output", "generated"]
     struc_acc = structural_acc(df)
     bleu_score = BLEUScores(df)
     offy_acc = offYAcc(df)
@@ -154,8 +156,8 @@ if __name__ == '__main__':
         train_dataset = train_dataset.remove_columns(["input", "output"])
         val_dataset = val_dataset.remove_columns(["input", "output"])
 
-        train_dataset = train_dataset.remove_columns(["__index_level_0__"])
-        val_dataset = val_dataset.remove_columns(["__index_level_0__"])
+        #train_dataset = train_dataset.remove_columns(["__index_level_0__"])
+        #val_dataset = val_dataset.remove_columns(["__index_level_0__"])
 
         train_dataset.set_format("torch")
         val_dataset.set_format("torch")
@@ -212,7 +214,7 @@ if __name__ == '__main__':
                         output_df = output_df.append(pd.DataFrame({'Source Text': references,
                                                                    'Generated Text': predictions}), ignore_index=True)
                     import os
-                    path = "model_test_grid_search_7/epoch_" + str(epoch) + "/model_" + samples[j] + "_" + str(
+                    path = "model_test_grid_search_8/epoch_" + str(epoch) + "/model_" + samples[j] + "_" + str(
                         learning_rate) + "_" + str(
                         epochs)
 
@@ -222,33 +224,50 @@ if __name__ == '__main__':
                         # Create a new directory because it does not exist
                         os.makedirs(path)
                         os.makedirs(path + "/predictions")
-                    isExist = os.path.exists("model_test_grid_search_7/final/predictions")
+                    isExist = os.path.exists("model_test_grid_search_8/final/predictions")
                     if not isExist:
-                        os.makedirs("model_test_grid_search_7/final/predictions")
+                        os.makedirs("model_test_grid_search_8/final/predictions")
 
                     output_df.to_csv(path + "/predictions/predictions_train.csv")
                     main(output_df, path + "/predictions/predictions_accuracies_train.csv")
                     model.eval()
-                    output_df = pd.DataFrame(columns=["Source Text", "Generated Text"])
+                    output_df = pd.DataFrame(columns=["Source Text", "Generated Text", "Actual Quote"])
                     for batch in eval_dataloader:
                         batch = {k: v.to(device) for k, v in batch.items()}
                         outputs = model(**batch)
                         loss = outputs.loss
-                        loss.backward()
-
-                        optimizer.step()
-                        lr_scheduler.step()
-                        optimizer.zero_grad()
                         progress_bar.update(1)
-
-                        logits = outputs.logits
-                        predictions = tokenizer.batch_decode(torch.argmax(logits, dim=-1), skip_special_tokens=False,
-                                                             padding=False)
-                        references = tokenizer.batch_decode(batch["labels"], skip_special_tokens=False, padding=False)
-                        output_df = output_df.append(pd.DataFrame({'Source Text': references,
-                                                                   'Generated Text': predictions}), ignore_index=True)
+                        #inputs = tokenizer(batch, add_special_tokens=False, return_tensors="pt", padding=True).to(
+                        #    device)
+                        inputs = batch
+                        #embed()
+                        output_sequences = model.to(device).generate(
+                            input_ids=inputs['input_ids'],
+                            attention_mask=inputs['attention_mask'],
+                            do_sample=False,  # disable sampling to test if batching affects output
+                            # eos_token_id = tokenizer.convert_tokens_to_ids("[eoo]"),
+                            max_length=64,
+                            repetition_penalty=0.75,
+                            # setting ngram repetition penalty to 3 (to be congruent with our similarity score acc. values)
+                            no_repeat_ngram_size=3,
+                            # Adding beam search instead of greedy decoding
+                            # num_beams = 5,
+                            # early_stopping = True
+                            # early_stopping = True
+                        )
+                        actual_quote = tokenizer.batch_decode(inputs['input_ids'],
+                                                skip_special_tokens=False,
+                                                padding=False)
+                        source_text = tokenizer.batch_decode(inputs['labels'],
+                                                skip_special_tokens=False,
+                                                padding=False)
+                        generated_text = tokenizer.batch_decode(output_sequences,
+                                                skip_special_tokens=False,
+                                                padding=False)
+                        output_df = output_df.append(pd.DataFrame({'Source Text': source_text,
+                                                      'Generated Text': generated_text, 'Actual Quote': actual_quote}))
                     model.train()
-                    path = "model_test_grid_search_7/epoch_" + str(epoch) + "/model_" + samples[j] + "_" + str(
+                    path = "model_test_grid_search_8/epoch_" + str(epoch) + "/model_" + samples[j] + "_" + str(
                         learning_rate) + "_" + str(
                         epochs)
 
@@ -258,13 +277,13 @@ if __name__ == '__main__':
                         # Create a new directory because it does not exist
                         os.makedirs(path)
                         os.makedirs(path + "/predictions")
-                    isExist = os.path.exists("model_test_grid_search_7/final/predictions")
+                    isExist = os.path.exists("model_test_grid_search_8/final/predictions")
                     if not isExist:
-                        os.makedirs("model_test_grid_search_7/final/predictions")
+                        os.makedirs("model_test_grid_search_8/final/predictions")
 
                     # save end of each epoch, eval while training
                     # evaluation script for each epoch
-
+                    #embed()
                     output_df.to_csv(path + "/predictions/predictions_dev.csv")
                     main(output_df, path + "/predictions/predictions_accuracies_dev.csv")
                     torch.save(model.state_dict(),
@@ -301,8 +320,8 @@ if __name__ == '__main__':
 
                 metric.compute()
 
-                output_df.to_csv("model_test_grid_search_7/final/predictions/model_predictions_grid_search_" + samples[j] + "_" + str(learning_rate) + "_" + str(epochs) + ".csv")
-                torch.save(model.state_dict(), "model_test_grid_search_7/final/model_"+ samples[j] + "_" + str(learning_rate) + "_" + str(epochs) + ".pth")
+                output_df.to_csv("model_test_grid_search_8/final/predictions/model_predictions_grid_search_" + samples[j] + "_" + str(learning_rate) + "_" + str(epochs) + ".csv")
+                torch.save(model.state_dict(), "model_test_grid_search_8/final/model_"+ samples[j] + "_" + str(learning_rate) + "_" + str(epochs) + ".pth")
                 #tokenizer.save_pretrained("model_test_4_tokenizer/")
                 i = i + 1
     j = j + 1
