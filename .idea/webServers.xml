@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="ce9e0793-2380-4167-b618-2438975491ee" name="adams_gpu" url="http://adams.cs.washington.edu">
+        <fileTransfer rootFolder="/home/nandsra" accessType="SFTP" host="adams.cs.washington.edu" port="22" sshConfigId="c91a4c42-6140-484b-9cf6-893488cbb96c" sshConfig="nandsra@adams.cs.washington.edu:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

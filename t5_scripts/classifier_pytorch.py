@@ -9,7 +9,7 @@ import pandas as pd
 from IPython import embed
 
 import argparse
-
+# dont include [boo] [eoo] tokens
 from sklearn.metrics import f1_score
 import re
 import numpy as np
@@ -141,6 +141,7 @@ if __name__ == '__main__':
             return tokenized_input
 
 
+
         special_tokens_dict = {
             'additional_special_tokens': ['[boi]', '[eoi]', '[OffY]', '[OffN]', '[ind]', '[grp]', '[ste]', '[boo]', '[eoo]']}
         num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
@@ -156,8 +157,8 @@ if __name__ == '__main__':
         train_dataset = train_dataset.remove_columns(["input", "output"])
         val_dataset = val_dataset.remove_columns(["input", "output"])
 
-        #train_dataset = train_dataset.remove_columns(["__index_level_0__"])
-        #val_dataset = val_dataset.remove_columns(["__index_level_0__"])
+        train_dataset = train_dataset.remove_columns(["__index_level_0__"])
+        val_dataset = val_dataset.remove_columns(["__index_level_0__"])
 
         train_dataset.set_format("torch")
         val_dataset.set_format("torch")
@@ -224,9 +225,9 @@ if __name__ == '__main__':
                         # Create a new directory because it does not exist
                         os.makedirs(path)
                         os.makedirs(path + "/predictions")
-                    isExist = os.path.exists("model_test_grid_search_8/final/predictions")
+                    isExist = os.path.exists("../model_test_grid_search_8/final/predictions")
                     if not isExist:
-                        os.makedirs("model_test_grid_search_8/final/predictions")
+                        os.makedirs("../model_test_grid_search_8/final/predictions")
 
                     output_df.to_csv(path + "/predictions/predictions_train.csv")
                     main(output_df, path + "/predictions/predictions_accuracies_train.csv")
@@ -247,9 +248,9 @@ if __name__ == '__main__':
                             do_sample=False,  # disable sampling to test if batching affects output
                             # eos_token_id = tokenizer.convert_tokens_to_ids("[eoo]"),
                             max_length=64,
-                            repetition_penalty=0.75,
+                            #repetition_penalty=0.75,
                             # setting ngram repetition penalty to 3 (to be congruent with our similarity score acc. values)
-                            no_repeat_ngram_size=3,
+                            #no_repeat_ngram_size=3,
                             # Adding beam search instead of greedy decoding
                             # num_beams = 5,
                             # early_stopping = True
@@ -277,9 +278,9 @@ if __name__ == '__main__':
                         # Create a new directory because it does not exist
                         os.makedirs(path)
                         os.makedirs(path + "/predictions")
-                    isExist = os.path.exists("model_test_grid_search_8/final/predictions")
+                    isExist = os.path.exists("../model_test_grid_search_8/final/predictions")
                     if not isExist:
-                        os.makedirs("model_test_grid_search_8/final/predictions")
+                        os.makedirs("../model_test_grid_search_8/final/predictions")
 
                     # save end of each epoch, eval while training
                     # evaluation script for each epoch

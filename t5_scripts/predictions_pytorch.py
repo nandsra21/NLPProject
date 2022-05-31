@@ -8,14 +8,18 @@ import torch
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--parent-model", help="the model file")
     parser.add_argument("--input-model", nargs = "+", help="the model file(s)")
     parser.add_argument("--input-validation", nargs="+", help="comma separated file with an input and output row")
     parser.add_argument("--output", nargs="+", help="the file of predictions")
 
     args = parser.parse_args()
 
-    tokenizer = T5Tokenizer.from_pretrained(args.parent_model + "/tokenizer")
+    tokenizer = T5Tokenizer.from_pretrained("t5-base")  # take from most recent checkpoints
+    special_tokens_dict = {
+        'additional_special_tokens': ['[boi]', '[eoi]', '[OffY]', '[OffN]', '[ind]', '[grp]', '[ste]', '[boo]',
+                                      '[eoo]']}
+    num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
+
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     torch.cuda.empty_cache()
@@ -25,8 +29,9 @@ if __name__ == '__main__':
     for model_file in args.input_model:
         for df in args.input_validation:
 
-            model = T5ForConditionalGeneration.from_pretrained("t5-small")
+            model = T5ForConditionalGeneration.from_pretrained("t5-base")
             model.load_state_dict(torch.load(model_file))
+            model.resize_token_embeddings(len(tokenizer))
             model.eval()
 
             print(model_file + " model file\n")
@@ -42,14 +47,14 @@ if __name__ == '__main__':
                 do_sample=False, # disable sampling to test if batching affects output
                 #eos_token_id = tokenizer.convert_tokens_to_ids("[eoo]"),
                 max_length = 64,
-                repetition_penalty = 0.75,
+                #repetition_penalty = 0.75,
                 # setting ngram repetition penalty to 3 (to be congruent with our similarity score acc. values)
-                no_repeat_ngram_size = 3,
+                #no_repeat_ngram_size = 5,
                 # Adding beam search instead of greedy decoding
-                #num_beams = 5,
-                #early_stopping = True
+                num_beams = 5,
+                early_stopping = True
             )
-
+            print(tokenizer.batch_decode(output_sequences, skip_special_tokens=False, padding=False))
             output = pd.DataFrame({'Source Text': labels, 'Generated Text': tokenizer.batch_decode(output_sequences, skip_special_tokens=False, padding=False)})
             output.to_csv(output_df[i])
             print(output_df[i] + " outputdf\n")

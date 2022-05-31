@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SshConfigs">
+    <configs>
+      <sshConfig authType="PASSWORD" host="adams.cs.washington.edu" id="c91a4c42-6140-484b-9cf6-893488cbb96c" port="22" nameFormat="DESCRIPTIVE" username="nandsra" />
+    </configs>
+  </component>
+</project>
