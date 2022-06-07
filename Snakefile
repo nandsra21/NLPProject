@@ -22,17 +22,17 @@ import pandas as pd
 # get batch size value
 BATCH_SIZE = 32
 # create separate batched dataframes
-sampled_df = pd.read_csv("data/sample.100K.csv").sample(frac=1)
-val = int(float(len(sampled_df)) / 32)
-list_df = np.array_split(sampled_df, val)
-for i, df in enumerate(list_df, 1):
-    df.to_csv(f'predictions_dfs/input_preds_{i}.csv')
-IDS = [f"input_preds_{i}" for i in range(1,val)]
+# sampled_df = pd.read_csv("data/sample.100K.csv").sample(frac=1)
+# val = int(float(len(sampled_df)) / 32)
+# list_df = np.array_split(sampled_df, val)
+# for i, df in enumerate(list_df, 1):
+#     df.to_csv(f'predictions_dfs/input_preds_{i}.csv')
+# IDS = [f"input_preds_{i}" for i in range(1,val)]
 
 rule all:
     input:
         #"predictions_initial_test_10.csv"
-        model = expand('model_gpt2_1/final/model_{num}_{lr}_{epoch}.pth', num=SAMPLES, lr=LR, epoch=EPOCHS)
+        model = expand('model_gpt2_2/final/model_{num}_{lr}_{epoch}.pth', num=SAMPLES, lr=LR, epoch=EPOCHS)
         #expand("model_{checkpoint}_gpt2.csv", checkpoint = IDS)
         #expand('predictions_{version}_4.csv', version=MODEL_VAL),
         #expand("accuracy_values_{version}_{checkpoint}.txt", version=MODEL_VAL, checkpoint = CHECKPOINTS)
@@ -62,7 +62,7 @@ rule create_model:
         training_csv = expand("sample.{num}.csv", num = SAMPLES),
         validation_csv = expand("sample.{num}.dev.csv", num = SAMPLES),
     output:
-        model = expand('model_gpt2_1/final/model_{num}_{lr}_{epoch}.pth', num=SAMPLES, lr=LR, epoch=EPOCHS),
+        model = expand('model_gpt2_2/final/model_{num}_{lr}_{epoch}.pth', num=SAMPLES, lr=LR, epoch=EPOCHS),
     shell:
         """
         python3 classifier_gpt2.py \

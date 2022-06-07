@@ -127,8 +127,7 @@ if __name__ == '__main__':
             tokenized_label = tokenizer(batch['output'], truncation=True, max_length=64, padding='max_length',
                                         add_special_tokens=False)
 
-            #tokenized_input['labels'] = tokenized_label['input_ids']
-
+            tokenized_input['labels'] = tokenized_label['input_ids']
             return tokenized_input
 
         special_tokens_dict = {
@@ -140,8 +139,8 @@ if __name__ == '__main__':
         train_dataset = train_dataset.map(tokenize, batched=True, batch_size=16)
         val_dataset = val_dataset.map(tokenize, batched=True, batch_size=16)
 
-        train_dataset.set_format('numpy', columns=['input_ids', 'attention_mask'])
-        val_dataset.set_format('numpy', columns=['input_ids', 'attention_mask'])
+        train_dataset.set_format('numpy', columns=['input_ids', 'attention_mask', 'labels'])
+        val_dataset.set_format('numpy', columns=['input_ids', 'attention_mask', 'labels'])
 
         train_dataset = train_dataset.remove_columns(["input", "output"])
         val_dataset = val_dataset.remove_columns(["input", "output"])
@@ -186,7 +185,7 @@ if __name__ == '__main__':
 
                     for batch in train_dataloader:
                         b_input_ids = batch["input_ids"].to(device)
-                        b_labels = batch["input_ids"].to(device)
+                        b_labels = batch["labels"].to(device)
                         b_masks = batch["attention_mask"].to(device)
 
                         #batch = {k: v.to(device) for k, v in batch.items()}
@@ -206,11 +205,21 @@ if __name__ == '__main__':
 
                         logits = outputs.logits
                         predictions = tokenizer.batch_decode(torch.argmax(logits, dim=-1), padding='max_length', skip_special_tokens=False)
-                        references = tokenizer.batch_decode(batch["input_ids"], padding='max_length', skip_special_tokens=False)
-                        output_df = output_df.append(pd.DataFrame({'Source Text': references,
-                                                                   'Generated Text': predictions}), ignore_index=True)
+                        #references = tokenizer.batch_decode(batch["input_ids"], padding='max_length', skip_special_tokens=False)
+                        #output_df = output_df.append(pd.DataFrame({'Source Text': references,
+                        #                                           'Generated Text': predictions}), ignore_index=True)
+
+                        actual_quote = tokenizer.batch_decode(batch['input_ids'],
+                                                              skip_special_tokens=False,
+                                                              padding=False)
+                        source_text = tokenizer.batch_decode(batch['labels'],
+                                                             skip_special_tokens=False,
+                                                             padding=False)
+                        output_df = output_df.append(pd.DataFrame({'Source Text': source_text,
+                                                                   'Generated Text': predictions,
+                                                                   'Actual Quote': actual_quote}))
                     import os
-                    path = "model_gpt2_1/epoch_" + str(epoch) + "/model_" + samples[j] + "_" + str(
+                    path = "model_gpt2_2/epoch_" + str(epoch) + "/model_" + samples[j] + "_" + str(
                         learning_rate) + "_" + str(
                         epochs)
 
@@ -220,9 +229,9 @@ if __name__ == '__main__':
                         # Create a new directory because it does not exist
                         os.makedirs(path)
                         os.makedirs(path + "/predictions")
-                    isExist = os.path.exists("../model_gpt2_1/final/predictions")
+                    isExist = os.path.exists("../model_gpt2_2/final/predictions")
                     if not isExist:
-                        os.makedirs("../model_gpt2_1/final/predictions")
+                        os.makedirs("../model_gpt2_2/final/predictions")
 
                     output_df.to_csv(path + "/predictions/predictions_train.csv")
                     main(output_df, path + "/predictions/predictions_accuracies_train.csv")
@@ -231,15 +240,20 @@ if __name__ == '__main__':
                     for batch in eval_dataloader:
                         batch = {k: v.to(device) for k, v in batch.items()}
                         outputs = model(**batch)
-                        inputs = tokenizer(batch, add_special_tokens=False, padding='max_length', return_tensors="pt").to(
-                           device)
                         inputs = batch
+
+                        b_input_ids = batch["input_ids"].to(device)
+                        b_labels = batch["labels"].to(device)
+                        b_masks = batch["attention_mask"].to(device)
+
+                        model.zero_grad()
+
                         output_sequences = model.to(device).generate(
-                            input_ids=inputs['input_ids'],
-                            attention_mask=inputs['attention_mask'],
+                            input_ids=b_input_ids,
+                            attention_mask=b_masks,
                             do_sample=False,  # disable sampling to test if batching affects output
                             # eos_token_id = tokenizer.convert_tokens_to_ids("[eoo]"),
-                            max_length=64,
+                            max_length=128,
                             #repetition_penalty=0.75,
                             # setting ngram repetition penalty to 3 (to be congruent with our similarity score acc. values)
                             #no_repeat_ngram_size=3,
@@ -248,27 +262,17 @@ if __name__ == '__main__':
                             # early_stopping = True
                             # early_stopping = True
                         )
-                        source_text = tokenizer.batch_decode(inputs['input_ids'],
+                        source_text = tokenizer.batch_decode(b_input_ids,
                                                 padding='max_length', skip_special_tokens=False)
-                        #source_text = tokenizer.batch_decode(inputs['labels'],
-                        #                        padding='max_length', skip_special_tokens=False)
+                        actual_quote = tokenizer.batch_decode(b_labels,
+                                                padding='max_length', skip_special_tokens=False)
                         generated_text = tokenizer.batch_decode(output_sequences,
                                                 padding='max_length', skip_special_tokens=False)
-                        output_df = output_df.append(pd.DataFrame({'Generated Text': generated_text, 'Source Text': source_text}))
+                        output_df = output_df.append(pd.DataFrame({'Generated Text': generated_text, 'Source Text': source_text, 'Actual Quote': actual_quote}))
                     model.train()
-                    path = "model_gpt2_1/epoch_" + str(epoch) + "/model_" + samples[j] + "_" + str(
+                    path = "model_gpt2_2/epoch_" + str(epoch) + "/model_" + samples[j] + "_" + str(
                         learning_rate) + "_" + str(
                         epochs)
-
-                    # Check whether the specified path exists or not
-                    isExist = os.path.exists(path)
-                    if not isExist:
-                        # Create a new directory because it does not exist
-                        os.makedirs(path)
-                        os.makedirs(path + "/predictions")
-                    isExist = os.path.exists("../model_gpt2_1/final/predictions")
-                    if not isExist:
-                        os.makedirs("../model_gpt2_1/final/predictions")
 
                     # save end of each epoch, eval while training
                     # evaluation script for each epoch
@@ -285,32 +289,69 @@ if __name__ == '__main__':
                 model.eval()
                 i = 0
                 for batch in eval_dataloader:
-                    batch = {k: v.to(device) for k, v in batch.items()}
-                    with torch.no_grad():
-                        outputs = model(**batch)
+                    b_input_ids = batch["input_ids"].to(device)
+                    b_labels = batch["labels"].to(device)
+                    b_masks = batch["attention_mask"].to(device)
 
-                    logits = outputs.logits
+                    # batch = {k: v.to(device) for k, v in batch.items()}
 
-                    predictions = tokenizer.batch_decode(torch.argmax(logits, dim=-1), padding='max_length', skip_special_tokens=False)
-                    references = tokenizer.batch_decode(batch["labels"], padding='max_length', skip_special_tokens=False)
+                    model.zero_grad()
+                    output_sequences = model.to(device).generate(
+                        input_ids=b_input_ids,
+                        attention_mask=b_masks,
+                        do_sample=False,  # disable sampling to test if batching affects output
+                        # eos_token_id = tokenizer.convert_tokens_to_ids("[eoo]"),
+                        max_length=128,
+                        # repetition_penalty=0.75,
+                        # setting ngram repetition penalty to 3 (to be congruent with our similarity score acc. values)
+                        # no_repeat_ngram_size=3,
+                        # Adding beam search instead of greedy decoding
+                        # num_beams = 5,
+                        # early_stopping = True
+                        # early_stopping = True
+                    )
+
+                    #predictions = tokenizer.batch_decode(torch.argmax(logits, dim=-1), padding='max_length', skip_special_tokens=False)
+                    #references = tokenizer.batch_decode(batch["input_ids"], padding='max_length', skip_special_tokens=False)
+
+                    source_text = tokenizer.batch_decode(b_input_ids,
+                                                         padding='max_length', skip_special_tokens=False)
+                    actual_quote = tokenizer.batch_decode(b_labels,
+                                                          padding='max_length', skip_special_tokens=False)
+                    generated_text = tokenizer.batch_decode(output_sequences,
+                                                            padding='max_length', skip_special_tokens=False)
                     # TODO: put predictions and references into a dataframe for reference later
-                    print([x.replace("<pad>", "") for x in predictions])
+                    print([x.replace("<pad>", "") for x in output_sequences])
                     print("^^predictions")
-                    print([x.replace("<pad>", "") for x in references])
+                    print([x.replace("<pad>", "") for x in source_text])
                     print("^^those were references")
 
-                    output_df = output_df.append(pd.DataFrame({'Source Text': references,
-                                           'Generated Text': predictions }), ignore_index = True)
+                    #output_df = output_df.append(pd.DataFrame({'Source Text': references,
+                    #                       'Generated Text': predictions }), ignore_index = True)
+                    output_df = output_df.append(pd.DataFrame(
+                        {'Generated Text': generated_text, 'Source Text': source_text, 'Actual Quote': actual_quote}), ignore_index = True)
                     print(output_df)
                     print("number of total batches so far: " + str(i))
                     #embed()
-                    metric.add_batch(predictions=predictions, references=references)
+                    metric.add_batch(predictions=generated_text, references=source_text)
                     i = i + 1
 
                 metric.compute()
 
-                output_df.to_csv("model_gpt2_1/final/predictions/model_predictions_grid_search_" + samples[j] + "_" + str(learning_rate) + "_" + str(epochs) + ".csv")
-                torch.save(model.state_dict(), "model_gpt2_1/final/model_"+ samples[j] + "_" + str(learning_rate) + "_" + str(epochs) + ".pth")
+                # path = "model_gpt2_2/final"
+                # # Check whether the specified path exists or not
+                # isExist = os.path.exists(path)
+                # if not isExist:
+                #     # Create a new directory because it does not exist
+                #     os.makedirs(path)
+                #     os.makedirs(path + "/predictions")
+                #     print("HERE!!!!")
+                # isExist = os.path.exists("../model_gpt2_2/final/predictions")
+                # if not isExist:
+
+                os.makedirs("model_gpt2_2/final/predictions")
+                output_df.to_csv("model_gpt2_2/final/predictions/model_predictions_grid_search_" + samples[j] + "_" + str(learning_rate) + "_" + str(epochs) + ".csv")
+                torch.save(model.state_dict(), "model_gpt2_2/final/model_"+ samples[j] + "_" + str(learning_rate) + "_" + str(epochs) + ".pth")
                 #tokenizer.save_pretrained("model_test_4_tokenizer/")
                 i = i + 1
     j = j + 1
